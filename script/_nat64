@@ -34,7 +34,7 @@ TAYGA_DEFAULT=/etc/default/tayga
 TAYGA_CONF=/etc/tayga.conf
 TAYGA_IPV4_ADDR=192.168.255.1
 TAYGA_IPV6_ADDR=fdaa:bb:1::1
-TAYGA_TUN_V6_ADDR=fdaa:bb:1::2
+TAYGA_TUN_V6_ADDR=fdaa:bb:1::1
 NAT44_SERVICE=/etc/init.d/otbr-nat44
 WLAN_IFNAMES=eth0
 
