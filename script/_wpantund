@@ -54,7 +54,7 @@ wpantund_install()
         (test -f config.status || ./configure --prefix=/usr --sysconfdir=/etc \
         --disable-ncp-dummy --enable-static-link-ncp-plugin=spinel) &&
         make && sudo make install &&
-        sudo sed -i '/Config:NCP:SocketPath "\/dev/i Config:NCP:SocketPath "/dev/ttyUSB0"' /etc/wpantund.conf) || die 'Failed to install wpantund!'
+        sudo sed -i '/Config:NCP:SocketPath "\/dev/i Config:NCP:SocketPath "/dev/ttyACM0"' /etc/wpantund.conf) || die 'Failed to install wpantund!'
 }
 
 wpantund_update()
