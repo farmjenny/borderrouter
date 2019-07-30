@@ -1,0 +1,514 @@
+#!/bin/bash
+#
+#  Copyright (c) 2017, The OpenThread Authors.
+#  All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#  1. Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in the
+#     documentation and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the
+#     names of its contributors may be used to endorse or promote products
+#     derived from this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+# Test thread commissioning along with openthread and wpantund.
+#
+# Usage:
+#   ./meshcop         # test with latest openthread and wpantund.
+#   NO_CLEAN=1 ./meshcop # test with existing binaries in ${TEST_BASE}.
+set -e
+
+# Get our starting directory and remember it
+readonly ORIGIN_PWD="$(pwd)"
+readonly SCRIPT_DIR="$(cd "$(dirname $0)" && pwd)"
+
+#---------------------------------------
+# Configurations
+#---------------------------------------
+readonly OT_NCP="${OT_NCP:-ot-ncp-ftd}"
+readonly OT_RCP="ot-rcp"
+readonly OT_CLI="${OT_CLI:-ot-cli-ftd}"
+readonly ABS_TOP_BUILDDIR="$(cd ${top_builddir:-${SCRIPT_DIR}/../../} && pwd)"
+readonly ABS_TOP_SRCDIR="$(cd ${top_srcdir:-${SCRIPT_DIR}/../../} && pwd)"
+readonly NO_CLEAN="${NO_CLEAN:-1}"
+readonly IGNORE_INSTALLED="${IGNORE_INSTALLED:-0}"
+readonly NCP_CONTROLLER="${NCP_CONTROLLER:-wpantund}"
+
+#----------------------------------------
+# Test constants
+#----------------------------------------
+readonly TEST_BASE=/tmp/test-otbr
+
+readonly WPANTUND=wpantund
+readonly OTBR_AGENT=otbr-agent
+readonly OTBR_WEB=otbr-web
+readonly OTBR_COMMISSIONER=otbr-commissioner
+
+readonly STAGE_DIR="${TEST_BASE}/stage"
+readonly BUILD_DIR="${TEST_BASE}/build"
+readonly WPANTUND_PATH="${STAGE_DIR}/usr/sbin/${WPANTUND}"
+readonly OTBR_COMMISSIONER_PATH="${ABS_TOP_BUILDDIR}/src/commissioner/${OTBR_COMMISSIONER}"
+readonly OTBR_PSKC_PATH="${ABS_TOP_BUILDDIR}/tools/pskc"
+readonly OTBR_AGENT_PATH="${ABS_TOP_BUILDDIR}/src/agent/${OTBR_AGENT}"
+readonly OT_CLI_PATH="${ABS_TOP_BUILDDIR}/third_party/openthread/output/otbr/bin/${OT_CLI}"
+readonly OT_NCP_PATH="${ABS_TOP_BUILDDIR}/third_party/openthread/output/otbr/bin/${OT_NCP}"
+readonly OT_RCP_PATH="${ABS_TOP_BUILDDIR}/third_party/openthread/output/otbr/bin/${OT_RCP}"
+readonly OTBR_DBUS_CONF="${ABS_TOP_SRCDIR}/src/agent/otbr-agent.conf"
+readonly OTBR_WEB_PATH="${ABS_TOP_BUILDDIR}/src/web/${OTBR_WEB}"
+
+# The node ids
+readonly LEADER_NODE_ID=1
+readonly JOINER_NODE_ID=2
+
+#
+# NOTE Joiner pass phrase:
+#   Must be at least 6 bytes long
+#   And this example has: J ZERO ONE N E R
+#   We cannot use letter O and I because Q O I Z are not allowed per spec
+readonly OT_JOINER_PASSPHRASE=J01NER
+
+# 18b430 is the nest EUI prefix.
+readonly OT_JOINER_EUI64="18b430000000000${JOINER_NODE_ID}"
+
+# The border agent, and ncp needs a pass phrase.
+readonly OT_AGENT_PASSPHRASE=MYPASSPHRASE
+
+# The network needs a name.
+readonly OT_NETWORK_NAME=MyTestNetwork
+
+# The agent is on the local host.
+readonly OT_AGENT_IPADDR='127.0.0.1'
+readonly OT_AGENT_IPPORT=49191
+
+# The TUN device for OpenThread border router.
+readonly TUN_NAME=wpan0
+
+echo "ORIGIN_PWD: ${ORIGIN_PWD}"
+echo "TEST_BASE: ${TEST_BASE}"
+echo "ABS_TOP_SRCDIR=${ABS_TOP_SRCDIR}"
+echo "ABS_TOP_BUILDDIR=${ABS_TOP_BUILDDIR}"
+
+#----------------------------------------
+# Helper functions
+#----------------------------------------
+
+die()
+{
+  exit_message="$@"
+  echo " *** ERROR: " "$@"
+  exit 1
+}
+
+exists_or_die()
+{
+  [[ -f "$1" ]] || die "Missing file: $1"
+}
+
+executable_or_die()
+{
+  [[ -x "$1" ]] || die "Missing executable: $1"
+}
+
+random_channel()
+{
+  expr 11 + "${RANDOM}" % 16
+}
+
+random_panid()
+{
+  printf "0x%04x" "${RANDOM}"
+}
+
+random_xpanid()
+{
+  printf "%04x%04x%04x%04x" "${RANDOM}" "${RANDOM}" "${RANDOM}" "${RANDOM}"
+}
+
+random_masterkey()
+{
+  printf "%04x%04x%04x%04x%04x%04x%04x%04x" "${RANDOM}" "${RANDOM}" "${RANDOM}" "${RANDOM}" "${RANDOM}" "${RANDOM}" "${RANDOM}" "${RANDOM}"
+}
+
+write_syslog()
+{
+  logger -p syslog.alert "OPENTHREAD_TEST: $@"
+}
+
+output_logs()
+{
+  write_syslog 'All apps should be dead now'
+
+  # part 1
+  # ------
+  #
+  # On travis (the CI server), we can't see what went into the
+  # syslog.  So this is here so we can see the output.
+  #
+  # part 2
+  # ------
+  #
+  # If we run locally, it is sometimes helpful for our victim (you
+  # the developer) to have logs split upto various files to help
+  # that victim, we'll GREP the log files according.
+  #
+  # Wait 5 seconds for the "logs to flush"
+  sleep 5
+
+  cd "${ORIGIN_PWD}"
+  echo 'START_LOG: SYSLOG ==================='
+  cat /var/log/syslog | tee complete-syslog.log
+  echo 'START_LOG: BR-AGENT ================='
+  cat /var/log/syslog | grep "${OTBR_AGENT}" | tee otbr-agent.log
+  echo 'START_LOG: OTBR-COMISSIONER ========='
+  cat /var/log/syslog | grep "${OTBR_COMMISSIONER}" | tee otbr-commissioner.log
+  echo 'START_LOG: OT-NCP ==================='
+  cat /var/log/syslog | grep "${OT_NCP}" | tee "${OT_NCP}.log"
+  echo 'START_LOG: OT-CLI ==================='
+  cat /var/log/syslog | grep "${OT_CLI}" | tee "${OT_CLI}.log"
+  echo 'START_LOG: WPANTUND ================='
+  cat /var/log/syslog | grep "${WPANTUND}" | tee wpantund.log
+  echo '====================================='
+  echo 'Hint, for each log Search backwards for: "START_LOG: <NAME>"'
+  echo '====================================='
+}
+
+build_dependencies()
+{
+  # Clean up old stuff
+  if [[ "${NO_CLEAN}" != 1 ]]; then
+    [[ ! -d "${STAGE_DIR}" ]] || rm -rf "${STAGE_DIR}"
+    [[ ! -d "${BUILD_DIR}" ]] || rm -rf "${BUILD_DIR}"
+  fi
+
+  [[ -d "${STAGE_DIR}" ]] || mkdir -p "${STAGE_DIR}"
+  [[ -d "${BUILD_DIR}" ]] || mkdir -p "${BUILD_DIR}"
+
+  # As above, these steps are broken up
+  if [[ "${IGNORE_INSTALLED}" = 0 ]] && which "${OT_NCP}" && which "${OT_CLI}"; then
+    ot_ncp="${OT_NCP}"
+    ot_cli="${OT_CLI}"
+    ot_rcp="${OT_RCP}"
+  else
+    compile_openthread
+    ot_ncp="${OT_NCP_PATH}"
+    ot_cli="${OT_CLI_PATH}"
+    ot_rcp="${OT_RCP_PATH}"
+  fi
+
+  [[ "${DEAMON}" == 1 ]] || {
+    if [[ "${IGNORE_INSTALLED}" = 0 ]] && sudo which "${WPANTUND}"; then
+      wpantund="${WPANTUND}"
+    else
+      checkout_wpantund
+      configure_wpantund
+      compile_wpantund
+      wpantund="${WPANTUND_PATH}"
+    fi
+  }
+
+  write_syslog "TEST: BUILD COMPLETE"
+}
+
+test_setup()
+{
+  # message for general failures
+  exit_message="JOINER FAILED"
+
+  executable_or_die "${OTBR_COMMISSIONER_PATH}"
+  executable_or_die "${OTBR_AGENT_PATH}"
+  executable_or_die "${OTBR_WEB_PATH}"
+
+  # Remove flashes
+  sudo rm -vrf "${TEST_BASE}/tmp"
+
+  build_dependencies
+
+  # We will be creating a lot of log information
+  # Rotate logs so we have a clean and empty set of logs uncluttered with other stuff
+  if [[ -f /etc/logrotate.conf ]]; then
+    sudo logrotate -f /etc/logrotate.conf || true
+  fi
+
+  # From now on - all exits are TRAPPED
+  # When they occur, we call the function: output_logs'.
+  trap test_teardown EXIT
+}
+
+test_teardown()
+{
+  # Capture the exit code so we can return it below
+  readonly EXITCODE=$?
+  write_syslog "EXIT ${EXITCODE} - output logs"
+
+  sudo killall "${WPANTUND}" || true
+  sudo killall "${OTBR_AGENT}" || true
+  sudo killall "${OTBR_WEB}" || true
+  sudo killall "${OTBR_COMMISSIONER}" || true
+  sudo killall "${OT_NCP}" || true
+  sudo killall "${OT_CLI}" || true
+  wait
+
+  if [[ "${NO_CLEAN}" != 1 ]]; then
+    echo 'clearing all'
+    sudo rm /etc/dbus-1/system.d/wpantund.conf || true
+    sudo rm /etc/dbus-1/system.d/otbr-agent.conf || true
+    sudo rm -rf "${STAGE_DIR}" || true
+    sudo rm -rf "${BUILD_DIR}" || true
+
+    output_logs
+  fi
+
+  echo "EXIT ${EXIT_CODE}: MESSAGE: ${exit_message}"
+  exit ${EXIT_CODE}
+}
+
+checkout_wpantund()
+{
+  cd "${BUILD_DIR}"
+
+  [[ -d 'wpantund' ]] || git clone --depth 1 https://github.com/openthread/wpantund.git
+}
+
+configure_wpantund()
+{
+  cd "${BUILD_DIR}/wpantund"
+
+  if [[ "${NO_CLEAN}" = 1 && -f Makefile ]]; then
+    echo 'Skip configure openthread'
+    return 0
+  fi
+
+  set -x
+  ./bootstrap.sh
+  ./configure \
+    --disable-ncp-dummy \
+    --exec-prefix=/usr \
+    --enable-static-link-ncp-plugin=spinel  \
+    --prefix= \
+    --without-connman
+  set +x
+}
+
+compile_wpantund()
+{
+  make -C "${BUILD_DIR}/wpantund" all
+  make -C "${BUILD_DIR}/wpantund" install DESTDIR="${STAGE_DIR}"
+
+  executable_or_die "${WPANTUND_PATH}"
+
+  sudo cp "${STAGE_DIR}/etc/dbus-1/system.d/wpantund.conf" /etc/dbus-1/system.d
+
+  if which service; then
+    # tell dbus to reload, we have changed/added a configuration file
+    sudo service dbus reload
+  else
+    write_syslog "WARNING: Do not know how to tell dbus to re-load config files"
+  fi
+}
+
+compile_openthread()
+{
+  (cd "${ABS_TOP_BUILDDIR}/third_party/openthread" && make -f repo/examples/Makefile-posix DISABLE_DOC=1 TargetTuple=otbr)
+  executable_or_die "${OT_NCP_PATH}"
+  executable_or_die "${OT_CLI_PATH}"
+  executable_or_die "${OT_RCP_PATH}"
+}
+
+leader_start()
+{
+  [[ "${NCP_CONTROLLER}" != openthread ]] || return 0
+  write_syslog "MESHCOP TEST BEGIN - rotated logs"
+
+  # These might not exit cleanly
+  write_syslog "LEADER: killing the old"
+
+  # Kill old wpantund
+  sudo killall "${WPANTUND}" || true
+  sudo killall "${OT_NCP}" || true
+
+  write_syslog "LEADER: starting"
+
+  # Do this within a private script as root.
+  set -x
+  (cd "${TEST_BASE}" && sudo "${wpantund}" -d 5 -I "${TUN_NAME}" \
+    -s "system:${ot_ncp} ${LEADER_NODE_ID}" &)
+  set +x
+
+  echo 'Waiting for wpantund to fully start'
+  sleep 10
+
+  # These should be running now and should not have crashed!
+  pidof "${WPANTUND}" || die "LEADER: Failed to start wpantund"
+  pidof "${OT_NCP}" || die "LEADER: Failed to start ${OT_NCP}"
+
+  write_syslog "LEADER: start complete"
+}
+
+
+ba_start()
+{
+  exists_or_die "${OTBR_DBUS_CONF}"
+  sudo cp "${OTBR_DBUS_CONF}" /etc/dbus-1/system.d
+
+  write_syslog "AGENT: kill old"
+  sudo killall "${OTBR_AGENT}" || true
+  write_syslog "AGENT: starting"
+
+  # check version
+  (cd "${ORIGIN_PWD}" && sudo "${OTBR_AGENT_PATH}" -V)
+  # check invalid arguments
+  (cd "${ORIGIN_PWD}" && ! sudo "${OTBR_AGENT_PATH}" -x)
+
+  # we launch this in the background
+  set -x
+  if [[ "${NCP_CONTROLLER}" = openthread ]]; then
+    (cd "${ORIGIN_PWD}" && sudo "${OTBR_AGENT_PATH}" -I "${TUN_NAME}" -v -d 6 ${ot_rcp} ${LEADER_NODE_ID}&)
+  else
+    (cd "${ORIGIN_PWD}" && sudo "${OTBR_AGENT_PATH}" -I "${TUN_NAME}" -v -d 6&)
+  fi
+  set +x
+
+  # wait for it to complete
+  sleep 10
+
+  pidof ${OTBR_AGENT} || die "AGENT: failed to start"
+  write_syslog "AGENT: start complete"
+}
+
+web_start()
+{
+  write_syslog "WEB: kill old"
+  sudo killall "${OTBR_WEB}" || true
+  write_syslog "WEB: starting"
+  (cd "${ORIGIN_PWD}" && sudo "${OTBR_WEB_PATH}" -I "${TUN_NAME}" -p 8773 -a 127.0.0.1&)
+  sleep 15
+
+  pidof ${OTBR_WEB} || die "WEB: failed to start"
+  write_syslog "WEB: start complete"
+}
+
+network_form()
+{
+  readonly OT_PANID="$(random_panid)"
+  readonly OT_XPANID="$(random_xpanid)"
+  readonly OT_MASTER_KEY="$(random_masterkey)"
+  readonly OT_CHANNEL="$(random_channel)"
+
+  curl --header "Content-Type: application/json" --request POST --data "{\"networkKey\":\"${OT_MASTER_KEY}\",\"prefix\":\"fd11:22::\",\"defaultRoute\":true,\"extPanId\":\"${OT_XPANID}\",\"panId\":\"${OT_PANID}\",\"passphrase\":\"${OT_AGENT_PASSPHRASE}\",\"channel\":${OT_CHANNEL},\"networkName\":\"${OT_NETWORK_NAME}\"}" http://127.0.0.1:8773/form_network | grep "success" || die "WEB: form failed"
+  sleep 15
+}
+
+commissioner_start()
+{
+  local args
+  write_syslog "COMMISSIONER: kill old"
+  sudo killall "${OTBR_COMMISSIONER}" || true
+
+  rm -f "${OT_COMMISSIONER_LOG_FILE}"
+  # Clear the args variable.
+  args=
+
+  # And network parameters
+  args="${args} --network-name      ${OT_NETWORK_NAME}"
+  args="${args} --xpanid            ${OT_XPANID}"
+  args="${args} --network-password  ${OT_AGENT_PASSPHRASE}"
+  args="${args} --joiner-eui64      ${OT_JOINER_EUI64}"
+  args="${args} --joiner-pskd       ${OT_JOINER_PASSPHRASE}"
+  args="${args} --agent-host        ${OT_AGENT_IPADDR}"
+  args="${args} --agent-port        ${OT_AGENT_IPPORT}"
+  #
+  # Debug level, full blast (this is test a test on a
+  # a remote machine, being able to *SEE* the result helpful
+  args="${args} --debug-level 7"
+
+  # Launch the commissioner in the background
+  set -x
+  (cd "${ORIGIN_PWD}" && "${OTBR_COMMISSIONER_PATH}" ${args} &)
+  set +x
+
+  # Wait for it to launch and get started.
+  sleep 5
+
+  # Is it still running or did it die?
+  pidof "${OTBR_COMMISSIONER}" || die "COMMISSIONER: failed to start"
+  #
+  # It takes about 8 to 10 seconds for the DTLS handshake to complete.
+  echo 'Waiting for commissioner'
+
+  # The ENVELOPE (total time) timeout is 200 seconds.
+  #
+  # If no COMM_KA occurs:
+  #    The Commissioner process timeout is 50 seconds.
+  # ELSE
+  #    (COMM_KA does occur)
+  #    The commissioner will not timeout
+  #
+  # By waiting 100 seconds we test that the timeout would have fired
+  # And that the COMM_KA process is actually working.
+  #
+  sleep 10
+  write_syslog "TEST: Commissioner COM_KA should be seen by now"
+  write_syslog "TEST: Commissioner ready for joiner"
+}
+
+web_commissioner_start()
+{
+  curl --header "Content-Type: application/json" --request POST --data "{\"pskd\":\"${OT_JOINER_PASSPHRASE}\", \"passphrase\":\"${OT_AGENT_PASSPHRASE}\"}" "http://127.0.0.1:8773/commission"&
+  sleep 15
+}
+
+joiner_start()
+{
+  write_syslog 'JOINER START'
+  expect -f-  <<EOF || die 'JOINER FAILED'
+send "cd ${TEST_BASE}\r\n"
+spawn ${ot_cli} ${JOINER_NODE_ID}
+send "ifconfig up\r\n"
+expect "Done"
+send "joiner start ${OT_JOINER_PASSPHRASE}\r\n"
+set timeout 20
+expect {
+  "Join success" {
+    send_user "succeeded to find join success"
+    send "exit\r\n"
+  }
+  timeout {
+    send_user "Failed to find join success"
+    exit 1
+  }
+}
+EOF
+  exit_message="JOINER SUCCESS COMPLETE"
+}
+
+main()
+{
+  test_setup
+  leader_start
+  ba_start
+  web_start
+  network_form
+  if [ "${COMMISSIONER_WEB}" ]; then
+    web_commissioner_start
+  else
+    commissioner_start
+  fi
+  joiner_start
+}
+
+main "$@"

@@ -29,13 +29,23 @@
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
 SUBDIRS                 = \
-    mbedtls               \
+    openthread            \
     wpantund              \
+    $(NULL)
+
+if OTBR_ENABLE_COMMISSIONER
+SUBDIRS                += \
     libcoap               \
-    Simple-web-server     \
-    mdl                   \
+    $(NULL)
+endif
+
+if OTBR_ENABLE_WEB_SERVICE
+SUBDIRS                += \
     angular               \
     angular-material      \
+    mdl                   \
+    Simple-web-server     \
     $(NULL)
+endif
 
 include $(abs_top_nlbuild_autotools_dir)/automake/post.am

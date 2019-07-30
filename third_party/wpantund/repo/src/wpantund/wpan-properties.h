@@ -67,6 +67,7 @@
 #define kWPANTUNDProperty_NCPTXPowerLimit                       "NCP:TXPowerLimit"
 #define kWPANTUNDProperty_NCPCCAThreshold                       "NCP:CCAThreshold"
 #define kWPANTUNDProperty_NCPChannelMask                        "NCP:ChannelMask"
+#define kWPANTUNDProperty_NCPPreferredChannelMask               "NCP:PreferredChannelMask"
 #define kWPANTUNDProperty_NCPSleepyPollInterval                 "NCP:SleepyPollInterval"
 #define kWPANTUNDProperty_NCPRSSI                               "NCP:RSSI"
 #define kWPANTUNDProperty_NCPCCAFailureRate                     "NCP:CCAFailureRate"
@@ -125,6 +126,7 @@
 #define kWPANTUNDProperty_ThreadOnMeshPrefixes                  "Thread:OnMeshPrefixes"
 #define kWPANTUNDProperty_ThreadRouterRoleEnabled               "Thread:RouterRole:Enabled"
 #define kWPANTUNDProperty_ThreadConfigFilterRLOCAddresses       "Thread:Config:FilterRLOCAddresses"
+#define kWPANTUNDProperty_ThreadConfigFilterALOCAddresses       "Thread:Config:FilterALOCAddresses"
 #define kWPANTUNDProperty_ThreadRouterUpgradeThreshold          "Thread:RouterUpgradeThreshold"
 #define kWPANTUNDProperty_ThreadRouterDowngradeThreshold        "Thread:RouterDowngradeThreshold"
 #define kWPANTUNDProperty_ThreadActiveDataset                   "Thread:ActiveDataset"
@@ -168,17 +170,16 @@
 #define kWPANTUNDDatasetCommand_SendMgmtSetPending              "SendMgmtSetPending"
 
 #define kWPANTUNDProperty_POSIXAppRCPVersion                    "POSIXApp:RCPVersion"
+#define kWPANTUNDProperty_POSIXAppRCPVersionCached              "POSIXApp:RCPVersion:Cached"
 
 #define kWPANTUNDProperty_OpenThreadLogLevel                    "OpenThread:LogLevel"
+#define kWPANTUNDProperty_OpenThreadSLAACEnabled                "OpenThread:SLAAC:Enabled"
 #define kWPANTUNDProperty_OpenThreadSteeringDataAddress         "OpenThread:SteeringData:Address"
 #define kWPANTUNDProperty_OpenThreadSteeringDataSetWhenJoinable "OpenThread:SteeringData:SetWhenJoinable"
 #define kWPANTUNDProperty_OpenThreadMsgBufferCounters           "OpenThread:MsgBufferCounters"
 #define kWPANTUNDProperty_OpenThreadMsgBufferCountersAsString   "OpenThread:MsgBufferCounters:AsString"
 #define kWPANTUNDProperty_OpenThreadDebugTestAssert             "OpenThread:Debug:TestAssert"
 #define kWPANTUNDProperty_OpenThreadDebugTestWatchdog           "OpenThread:Debug:TestWatchdog"
-
-#define kWPANTUNDProperty_NCPCounterAllMac                      "NCP:Counter:AllMac"
-#define kWPANTUNDProperty_NCPCounterAllMacAsValMap              "NCP:Counter:AllMac:AsValMap"
 
 #define kWPANTUNDProperty_DebugIPv6GlobalIPAddressList          "Debug:IPv6:GlobalIPAddressList"
 
@@ -189,6 +190,10 @@
 #define kWPANTUNDProperty_MACBlacklistEnabled                   "MAC:Blacklist:Enabled"
 #define kWPANTUNDProperty_MACBlacklistEntries                   "MAC:Blacklist:Entries"
 #define kWPANTUNDProperty_MACBlacklistEntriesAsValMap           "MAC:Blacklist:Entries:AsValMap"
+
+#define kWPANTUNDProperty_MACFilterFixedRssi                    "MAC:Filter:FixedRssi"
+#define kWPANTUNDProperty_MACFilterEntries                      "MAC:Filter:Entries"
+#define kWPANTUNDProperty_MACFilterEntriesAsValMap              "MAC:Filter:Entries:AsValMap"
 
 #define kWPANTUNDProperty_JamDetectionStatus                    "JamDetection:Status"
 #define kWPANTUNDProperty_JamDetectionEnable                    "JamDetection:Enable"
@@ -232,6 +237,11 @@
 #define kWPANTUNDCommissionerState_Active                       "active"
 
 #define kWPANTUNDProperty_ThreadJoinerState                     "Thread:Joiner:State"
+
+#define kWPANTUNDProperty_NCPCounterAllMac                      "NCP:Counter:AllMac"
+#define kWPANTUNDProperty_NCPCounterAllMacAsValMap              "NCP:Counter:AllMac:AsValMap"
+#define kWPANTUNDProperty_NCPCounterThreadMle                   "NCP:Counter:Thread:Mle"
+#define kWPANTUNDProperty_NCPCounterThreadMleAsValMap           "NCP:Counter:Thread:Mle:AsValMap"
 
 #define kWPANTUNDProperty_NCPCounter_TX_PKT_TOTAL               "NCP:Counter:TX_PKT_TOTAL"
 #define kWPANTUNDProperty_NCPCounter_TX_PKT_UNICAST             "NCP:Counter:TX_PKT_UNICAST"
@@ -319,6 +329,11 @@
 #define kWPANTUNDProperty_StatLinkQualityPeriod                 "Stat:LinkQuality:Period"
 #define kWPANTUNDProperty_StatHelp                              "Stat:Help"
 
+#define kWPANTUNDProperty_ThreadServices                        "Thread:Services"
+#define kWPANTUNDProperty_ThreadServicesAsValMap                "Thread:Services:AsValMap"
+#define kWPANTUNDProperty_ThreadLeaderServices                  "Thread:Leader:Services"
+#define kWPANTUNDProperty_ThreadLeaderServicesAsValMap          "Thread:Leader:Services:AsValMap"
+
 // ----------------------------------------------------------------------------
 
 #define kWPANTUNDNodeType_Unknown                               "unknown"
@@ -353,6 +368,18 @@
 #define kWPANTUNDNCPMCUPowerState_On                            "on"
 #define kWPANTUNDNCPMCUPowerState_LowPower                      "low-power"
 #define kWPANTUNDNCPMCUPowerState_Off                           "off"
+
+
+// ----------------------------------------------------------------------------
+
+// Values of the property kWPANTUNDProperty_ThreadJoinerState
+
+#define kWPANTUNDThreadJoinerState_Idle                         "idle"
+#define kWPANTUNDThreadJoinerState_Discover                     "discover"
+#define kWPANTUNDThreadJoinerState_Connecting                   "connecting"
+#define kWPANTUNDThreadJoinerState_Connected                    "connected"
+#define kWPANTUNDThreadJoinerState_Entrust                      "entrust"
+#define kWPANTUNDThreadJoinerState_Joined                       "joined"
 
 // ----------------------------------------------------------------------------
 
@@ -406,6 +433,14 @@
 #define kWPANTUNDValueMapKey_Scan_EnableFiltering               "Scan:EnableFiltering"
 #define kWPANTUNDValueMapKey_Scan_PANIDFilter                   "Scan:PANID"
 
+#define kWPANTUNDValueMapKey_Joiner_ReturnImmediatelyOnStart    "Joiner:ReturnImmediatelyOnStart"
+#define kWPANTUNDValueMapKey_Joiner_ProvisioningUrl             "Joiner:ProvisioningUrl"
+#define kWPANTUNDValueMapKey_Joiner_PSKd                        "Joiner:PSKd"
+#define kWPANTUNDValueMapKey_Joiner_VendorName                  "Joiner:Vendor:Name"
+#define kWPANTUNDValueMapKey_Joiner_VendorModel                 "Joiner:Vendor:Model"
+#define kWPANTUNDValueMapKey_Joiner_VendorSwVersion             "Joiner:Vendor:SwVersion"
+#define kWPANTUNDValueMapKey_Joiner_VendorData                  "Joiner:Vendor:Data"
+
 #define kWPANTUNDValueMapKey_Counter_TxTotal                    "TxTotal"              // Number of transmissions
 #define kWPANTUNDValueMapKey_Counter_TxUnicast                  "TxUnicast"            // Number of unicast transmissions
 #define kWPANTUNDValueMapKey_Counter_TxBroadcast                "TxBroadcast"          // Number of broadcast transmissions
@@ -439,7 +474,25 @@
 #define kWPANTUNDValueMapKey_Counter_RxErrFcs                   "RxErrFcs"             // Number of received packets with FCS error
 #define kWPANTUNDValueMapKey_Counter_RxErrOther                 "RxErrOther"           // Number of received packets with other error
 
+#define kWPANTUNDValueMapKey_MleCounter_DisabledRole            "DisabledRole"         // The number of times device entered DISABLED role.
+#define kWPANTUNDValueMapKey_MleCounter_DetachedRole            "DetachedRole"         // The number of times device entered DETACHED role.
+#define kWPANTUNDValueMapKey_MleCounter_ChildRole               "ChildRole"            // The number of times device entered CHILD role.
+#define kWPANTUNDValueMapKey_MleCounter_RouterRole              "RouterRole"           // The number of times device entered ROUTER role.
+#define kWPANTUNDValueMapKey_MleCounter_LeaderRole              "LeaderRole"           // The number of times device entered LEADER role.
+#define kWPANTUNDValueMapKey_MleCounter_AttachAttempts          "AttachAttempts"       // The number of attach attempts while device was detached.
+#define kWPANTUNDValueMapKey_MleCounter_PartitionIdChanges      "PartitionIdChanges"   // The number of changes to partition ID.
+#define kWPANTUNDValueMapKey_MleCounter_BetterPartitionAttaches "BetterPartAttaches"   // The number of attempts to attach to a better partition.
+#define kWPANTUNDValueMapKey_MleCounter_ParentChanges           "ParentChanges"        // The number of times device changed its parents.
+
 #define kWPANTUNDValueMapKey_TimeSync_Time                      "ThreadNetworkTime"
 #define kWPANTUNDValueMapKey_TimeSync_Status                    "TimeSyncStatus"
+#define kWPANTUNDValueMapKey_TimeSync_ReceivedMonoTimeUs        "TimeSyncReceivedMonoTimeUs"
+
+#define kWPANTUNDValueMapKey_Service_ServiceId                  "ServiceId"
+#define kWPANTUNDValueMapKey_Service_EnterpriseNumber           "EnterpriseNumber"
+#define kWPANTUNDValueMapKey_Service_ServiceData                "ServiceData"
+#define kWPANTUNDValueMapKey_Service_Stable                     "Stable"
+#define kWPANTUNDValueMapKey_Service_ServerData                 "ServerData"
+#define kWPANTUNDValueMapKey_Service_RLOC16                     "RLOC16"
 
 #endif

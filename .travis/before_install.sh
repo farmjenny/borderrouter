@@ -65,6 +65,12 @@ linux)
         exit 0
     }
 
+    [ $BUILD_TARGET != meshcop ] || {
+        echo 0 | sudo tee /proc/sys/net/ipv6/conf/all/disable_ipv6
+        echo 1 | sudo tee /proc/sys/net/ipv6/conf/all/forwarding
+        echo 1 | sudo tee /proc/sys/net/ipv4/conf/all/forwarding
+    }
+
     [ $BUILD_TARGET != android-check ] || {
         sudo apt-get install -y gcc-multilib g++-multilib
         (
@@ -82,6 +88,7 @@ linux)
         autoconf-archive         \
         doxygen                  \
         ctags                    \
+        expect                   \
         libboost-dev             \
         libboost-filesystem-dev  \
         libboost-system-dev      \
@@ -94,7 +101,6 @@ linux)
 
     [ $BUILD_TARGET != posix-check ] || {
         sudo apt-get install -y  \
-            expect               \
             avahi-daemon         \
             avahi-utils          \
             $NULL

@@ -38,15 +38,15 @@ AC_PREREQ([2.68])
 # Initialize autoconf for the package
 #
 AC_INIT([OTBR],
-        m4_esyscmd([third_party/nlbuild-autotools/repo/scripts/mkversion -b `cat .default-version` .]),
+        m4_esyscmd([third_party/openthread/repo/third_party/nlbuild-autotools/repo/scripts/mkversion -b `cat .default-version` .]),
         [openthread-devel@googlegroups.com],
         [otbr],
-        [https://github.com/openthread/ot-br-private])
+        [https://github.com/openthread/ot-br-posix])
 
 # Tell the rest of the build system the absolute path where the
 # nlbuild-autotools repository is rooted at.
 
-AC_SUBST(nlbuild_autotools_stem,[third_party/nlbuild-autotools/repo])
+AC_SUBST(nlbuild_autotools_stem,[third_party/openthread/repo/third_party/nlbuild-autotools/repo])
 AC_SUBST(abs_top_nlbuild_autotools_dir,[\${abs_top_srcdir}/\${nlbuild_autotools_stem}])
 
 #
@@ -61,7 +61,7 @@ AC_SUBST(abs_top_nlbuild_autotools_dir,[\${abs_top_srcdir}/\${nlbuild_autotools_
 #
 AC_SUBST(LIBOTBR_VERSION_CURRENT,  [0])
 AC_SUBST(LIBOTBR_VERSION_AGE,      [1])
-AC_SUBST(LIBOTBR_VERSION_REVISION, [0])
+AC_SUBST(LIBOTBR_VERSION_REVISION, [1])
 AC_SUBST(LIBOTBR_VERSION_INFO,     [${LIBOTBR_VERSION_CURRENT}:${LIBOTBR_VERSION_REVISION}:${LIBOTBR_VERSION_AGE}])
 
 #
@@ -74,12 +74,12 @@ AC_CONFIG_SRCDIR([src/common/types.hpp])
 # Tell autoconf where to find auxilliary build tools (e.g. config.guess,
 # install-sh, missing, etc.)
 #
-AC_CONFIG_AUX_DIR([third_party/nlbuild-autotools/repo/autoconf])
+AC_CONFIG_AUX_DIR([third_party/openthread/repo/third_party/nlbuild-autotools/repo/autoconf])
 
 #
 # Tell autoconf where to find auxilliary M4 macros
 #
-AC_CONFIG_MACRO_DIR([third_party/nlbuild-autotools/repo/autoconf/m4])
+AC_CONFIG_MACRO_DIR([third_party/openthread/repo/third_party/nlbuild-autotools/repo/autoconf/m4])
 
 #
 # Tell autoconf what file the package is using to aggregate C preprocessor
@@ -201,7 +201,7 @@ AC_PATH_PROG(PERL, perl)
 #
 
 PROSPECTIVE_CFLAGS="-Wall -Wextra -Wshadow -Werror -std=c99 -pedantic-errors"
-PROSPECTIVE_CXXFLAGS="-Wall -Wextra -Wshadow -Werror -std=gnu++98 -Wno-c++14-compat"
+PROSPECTIVE_CXXFLAGS="-Wall -Wextra -Wshadow -Werror -std=c++11 -Wno-c++14-compat"
 
 AC_CACHE_CHECK([whether $CC is Clang],
     [nl_cv_clang],
@@ -266,7 +266,6 @@ AM_CONDITIONAL([OTBR_BUILD_OPTIMIZED], [test "${nl_cv_build_optimized}" = "yes"]
 
 AC_SUBST(PRETTY, ["\${abs_top_srcdir}/.script/clang-format.sh"])
 AC_SUBST(PRETTY_ARGS, ["-style=file -i"])
-AC_SUBST(PRETTY_CHECK, ["uncrustify"])
 AC_SUBST(PRETTY_CHECK, ["\${abs_top_srcdir}/.script/clang-format-check.sh"])
 AC_SUBST(PRETTY_CHECK_ARGS, [""])
 
@@ -292,6 +291,37 @@ AM_CONDITIONAL([OTBR_BUILD_TESTS], [test "${nl_cv_build_tests}" = "yes"])
 NL_ENABLE_DOCS([auto],[NO])
 
 AM_CONDITIONAL(OTBR_BUILD_DOCS, [test "${nl_cv_build_docs}" = "yes"])
+
+#
+# Commissioner
+#
+
+AC_ARG_ENABLE(commissioner,
+    [AS_HELP_STRING([--enable-commissioner],[Enable commissioner @<:@default=yes@:>@.])],
+    [
+        case "${enableval}" in
+
+        no|yes)
+            enable_commissioner=${enableval}
+            ;;
+
+        *)
+            AC_MSG_ERROR([Invalid value ${enable_commissioner} for --enable-commissioner])
+            ;;
+        esac
+    ],
+    [enable_commissioner=yes])
+
+if test "$enable_commissioner" = "yes"; then
+    OTBR_ENABLE_COMMISSIONER=1
+else
+    OTBR_ENABLE_COMMISSIONER=0
+fi
+
+AC_MSG_RESULT(${enable_commissioner})
+AC_SUBST(OTBR_ENABLE_COMMISSIONER)
+AM_CONDITIONAL([OTBR_ENABLE_COMMISSIONER], [test "${enable_commissioner}" = "yes"])
+
 #
 # Web Service
 #
@@ -334,8 +364,28 @@ AC_MSG_NOTICE([checking required package dependencies])
 
 # NL_WITH_PACKAGE(...)
 
+AC_ARG_WITH(ncp,
+  AC_HELP_STRING([--with-ncp=NCP_TYPE], [specify the type of NCP implementation: wpantund, openthread @<:@default=wpantund@:>@.]),
+  [with_ncp=${withval}],
+  [with_ncp=wpantund]
+)
+
+case "${with_ncp}" in
+openthread)
+  AC_DEFINE_UNQUOTED([OTBR_ENABLE_NCP_OPENTHREAD], [1], [Define to 1 if you want to choose wpantund to manage NCP])
+  ;;
+wpantund)
+  AC_DEFINE_UNQUOTED([OTBR_ENABLE_NCP_WPANTUND], [1], [Define to 1 if you want to choose openthread to manage NCP])
+  ;;
+*)
+  AC_MSG_ERROR([Invalid value ${with_ncp} for --with-ncp])
+esac
+
+AM_CONDITIONAL([OTBR_ENABLE_NCP_OPENTHREAD], [test "${with_ncp}" = "openthread"])
+AM_CONDITIONAL([OTBR_ENABLE_NCP_WPANTUND], [test "${with_ncp}" = "wpantund"])
+
 AC_ARG_WITH(mdns,
-  AC_HELP_STRING([--with-mdns=MDNS_TYPE], [specify the type of mdns implementation: avahi, mDNSResponder @<:@default=avahi@:>@.]),
+  AC_HELP_STRING([--with-mdns=MDNS_TYPE], [specify the type of mdns implementation: avahi, mDNSResponder, none @<:@default=avahi@:>@.]),
   [with_mdns=${withval}],
   [with_mdns=avahi]
 )
@@ -346,6 +396,8 @@ avahi)
   ;;
 mDNSResponder)
   AC_DEFINE_UNQUOTED([OTBR_ENABLE_MDNS_MDNSSD], [1], [Define to 1 if you want to choose mDNSResponder to provide mdns])
+  ;;
+none)
   ;;
 *)
   AC_MSG_ERROR([Invalid value ${with_mdns} for --with-mdns])
@@ -359,12 +411,18 @@ AC_MSG_CHECKING([checking if Exuberant Ctags is available])
 AC_PATH_PROGS_FEATURE_CHECK([CTAGS], [ctags],
                             [$ac_path_CTAGS --version | grep -q Exuberant &&
                              ac_cv_path_CTAGS=$ac_path_CTAGS],
-                            [AC_MSG_ERROR([could not find ctags])])
+                            [
+                                if test "$enable_commissioner" = "yes"; then
+                                    AC_MSG_ERROR([could not find ctags])
+                                fi
+                            ])
 AC_MSG_RESULT([$ac_cv_path_CTAGS])
 
 # Check if the DBus module
 
-PKG_CHECK_MODULES(DBUS, [dbus-1 >= 1.4], , [AC_MSG_ERROR([could not find dbus(>= 1.4)])])
+if test "${with_mdns}" == "avahi" -o "${with_ncp}" == "wpantund"; then
+  PKG_CHECK_MODULES(DBUS, [dbus-1 >= 1.4], , [AC_MSG_ERROR([could not find dbus(>= 1.4)])])
+fi
 AC_SUBST(DBUS_CFLAGS)
 AC_SUBST(DBUS_LIBS)
 
@@ -417,10 +475,6 @@ AC_DEFUN([OTBR_REQUIRE_HEADER],
 
 OTBR_REQUIRE_HEADER([stdint.h])
 OTBR_REQUIRE_HEADER([string.h])
-AC_LANG_PUSH(C++)
-OTBR_REQUIRE_HEADER([boost/scoped_ptr.hpp])
-OTBR_REQUIRE_HEADER([boost/shared_ptr.hpp])
-AC_LANG_POP(C++)
 
 #
 # Check for types and structures
@@ -446,12 +500,36 @@ fi
 
 CPPFLAGS="${CPPFLAGS} ${NL_COVERAGE_CPPFLAGS}"
 LIBS="${LIBS} ${NL_COVERAGE_LIBS}"
+LDFLAGS="${LDFLAGS} ${NL_COVERAGE_LDFLAGS}"
 
 # At this point, we can restore the compiler flags to whatever the
 # user passed in, now that we're clear of an -Werror issues by
 # transforming -Wno-error back to -Werror.
 
 NL_RESTORE_WERROR
+
+#
+# Agent user
+#
+
+AC_ARG_WITH(
+    [agent-user],
+    [AS_HELP_STRING([--with-agent-user=<USER>],[Specify the user to run otbr-agent service @<:@default=root@:>@.])],
+    [
+	    OTBR_AGENT_USER="${withval}"
+    ],
+    [
+	    OTBR_AGENT_USER=root
+    ])
+
+AC_MSG_CHECKING([Agent user])
+AC_MSG_RESULT(${OTBR_AGENT_USER})
+AC_SUBST(OTBR_AGENT_USER)
+AC_DEFINE_UNQUOTED([OTBR_AGENT_USER],[${OTBR_AGENT_USER}],[Define the user to run otbr-agent service])
+
+#
+# systemd
+#
 
 AC_ARG_WITH([systemdsystemunitdir],
             AS_HELP_STRING([--with-systemdsystemunitdir=DIR], [Path to install systemd unit files.]),
@@ -469,7 +547,7 @@ Makefile
 third_party/Makefile
 third_party/Simple-web-server/Makefile
 third_party/libcoap/Makefile
-third_party/mbedtls/Makefile
+third_party/openthread/Makefile
 third_party/wpantund/Makefile
 third_party/mdl/Makefile
 third_party/angular/Makefile
@@ -477,21 +555,24 @@ third_party/angular-material/Makefile
 include/Makefile
 src/Makefile
 src/agent/Makefile
+src/agent/otbr-agent.conf
 src/commissioner/Makefile
 src/common/Makefile
 src/utils/Makefile
 src/web/Makefile
 tests/Makefile
 tests/mdns/Makefile
-tests/meshcop/Makefile
 tests/tools/Makefile
 tests/unit/Makefile
 tools/Makefile
 doc/Makefile
 ])
 
-ac_configure_args="$ac_configure_args --disable-examples --disable-documentation"
-AC_CONFIG_SUBDIRS([third_party/libcoap/repo])
+if test "$enable_commissioner" = "yes"; then
+    ac_configure_args="$ac_configure_args --disable-examples --disable-documentation"
+    AC_CONFIG_SUBDIRS([third_party/libcoap/repo])
+fi
+
 #
 # Generate the auto-generated files for the package
 #
@@ -521,6 +602,8 @@ AC_MSG_NOTICE([
   Build coverage libraries                  : ${nl_cv_build_coverage}
   Build coverage reports                    : ${nl_cv_build_coverage_reports}
   MDNS implementation                       : ${with_mdns}
+  Commissioner                              : ${enable_commissioner}
+  Web service                               : ${enable_web_service}
   Lcov                                      : ${LCOV:--}
   Genhtml                                   : ${GENHTML:--}
   Build tests                               : ${nl_cv_build_tests}

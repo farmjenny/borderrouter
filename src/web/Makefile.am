@@ -28,40 +28,53 @@
 
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
+include $(top_srcdir)/third_party/openthread/mbedtls.mk
+include $(top_srcdir)/third_party/openthread/openthread.mk
+
 # Temporary disable -Werror for the included third party server_http
 
-override CXXFLAGS := $(filter-out -std=gnu++98 -Wshadow -Werror,$(CXXFLAGS))
+override CXXFLAGS := $(filter-out -Wshadow -Werror,$(CXXFLAGS))
 
 sbin_PROGRAMS = otbr-web
 
 otbr_web_SOURCES                                           = \
     main.cpp                                                 \
-	$(NULL)
+    $(NULL)
 
 otbr_web_LDADD                                             = \
     libotbr-web.la                                           \
-	$(NULL)
+    $(NULL)
+
+otbr_web_LDFLAGS                                           = \
+    -static                                                  \
+    $(NULL)
 
 otbr_web_CPPFLAGS                                          = \
     $(libotbr_web_la_CPPFLAGS)                               \
-	$(NULL)
+    $(NULL)
 
 noinst_LTLIBRARIES = libotbr-web.la
 
 libotbr_web_la_LIBADD                                           = \
     $(DBUS_LIBS)                                                  \
-    -lavahi-common                                                \
-    -lavahi-client                                                \
     -lboost_filesystem                                            \
     -lboost_system                                                \
     -lpthread                                                     \
     -ljsoncpp                                                     \
-    $(top_builddir)/third_party/mbedtls/libmbedtls.la             \
+    $(top_builddir)/src/commissioner/libotbr-commissioner.la      \
+    $(top_builddir)/src/agent/libotbr-agent.la                    \
     $(top_builddir)/src/utils/libutils.la                         \
     $(top_builddir)/src/common/libotbr-logging.la                 \
     $(NULL)
 
 libotbr_web_la_SOURCES                                          = \
+    web-service/web_server.cpp                                    \
+    web-service/wpan_service.cpp                                  \
+    $(NULL)
+
+
+if OTBR_ENABLE_NCP_WPANTUND
+libotbr_web_la_SOURCES                                         += \
     wpan-controller/dbus_base.cpp                                 \
     wpan-controller/dbus_join.cpp                                 \
     wpan-controller/dbus_set.cpp                                  \
@@ -72,29 +85,32 @@ libotbr_web_la_SOURCES                                          = \
     wpan-controller/dbus_scan.cpp                                 \
     wpan-controller/dbus_ifname.cpp                               \
     wpan-controller/wpan_controller.cpp                           \
-    web-service/web_server.cpp                                    \
-    web-service/wpan_service.cpp                                  \
     $(NULL)
+endif
+
+if OTBR_ENABLE_NCP_OPENTHREAD
+libotbr_web_la_SOURCES                                         += \
+    web-service/ot_client.cpp                                     \
+    $(NULL)
+endif
 
 libotbr_web_la_LDFLAGS                                          = \
     -static                                                       \
     $(NULL)
 
 libotbr_web_la_CPPFLAGS                                         = \
-    $(DBUS_CFLAGS)                                                \
     -I$(top_srcdir)/src                                           \
     -I$(top_srcdir)/src/wpan-controller                           \
     -I$(top_srcdir)/src/web-service                               \
     -I$(top_srcdir)/third_party/Simple-web-server/repo/           \
-    -I$(top_srcdir)/third_party/mbedtls/repo/configs              \
-    -I$(top_srcdir)/third_party/mbedtls/repo/include              \
     -I$(top_srcdir)/third_party/wpantund/repo/src                 \
     -I$(top_srcdir)/third_party/wpantund/repo/src/ipc-dbus        \
     -I$(top_srcdir)/third_party/wpantund/repo/src/wpanctl         \
     -I$(top_srcdir)/third_party/wpantund/repo/src/wpantund        \
-    -DMBEDTLS_CONFIG_FILE='<config-thread.h>'                     \
     -DWEB_FILE_PATH=\"$(datadir)/border-router/frontend\"         \
-    -std=c++11                                                    \
+    $(DBUS_CFLAGS)                                                \
+    $(MBEDTLS_CPPFLAGS)                                           \
+    $(OPENTHREAD_CPPFLAGS)                                        \
     $(NULL)
 
 jsdir = $(datadir)/border-router/frontend/res/js
@@ -125,6 +141,7 @@ html_DATA                                                      = \
 
 noinst_HEADERS                                                 = \
     utils/encoding.hpp                                           \
+    web-service/ot_client.hpp                                    \
     web-service/web_server.hpp                                   \
     web-service/wpan_service.hpp                                 \
     wpan-controller/dbus_base.hpp                                \

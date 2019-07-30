@@ -46,6 +46,7 @@
 #include "common/code_utils.hpp"
 #include "common/logging.hpp"
 #include "common/time.hpp"
+#include "utils/strcpy_utils.hpp"
 
 AvahiTimeout::AvahiTimeout(const struct timeval *aTimeout,
                            AvahiTimeoutCallback  aCallback,
@@ -229,12 +230,12 @@ void Poller::UpdateFdSet(fd_set &aReadFdSet, fd_set &aWriteFdSet, fd_set &aError
         }
         else
         {
-            int sec;
-            int usec;
+            time_t      sec;
+            suseconds_t usec;
 
             timeout -= now;
-            sec  = timeout / 1000;
-            usec = (timeout % 1000) * 1000;
+            sec  = static_cast<time_t>(timeout / 1000);
+            usec = static_cast<suseconds_t>((timeout % 1000) * 1000);
 
             if (sec < aTimeout.tv_sec)
             {
@@ -472,7 +473,7 @@ void PublisherAvahi::HandleClientState(AvahiClient *aClient, AvahiClientState aS
         break;
 
     case AVAHI_CLIENT_CONNECTING:
-        otbrLog(OTBR_LOG_DEBUG, "Connecting to avahi server...");
+        otbrLog(OTBR_LOG_DEBUG, "Connecting to avahi server");
         break;
 
     default:
@@ -534,7 +535,7 @@ otbrError PublisherAvahi::PublishService(uint16_t aPort, const char *aName, cons
         if (!strncmp(it->mName, aName, sizeof(it->mName)) && !strncmp(it->mType, aType, sizeof(it->mType)) &&
             it->mPort == aPort)
         {
-            otbrLog(OTBR_LOG_INFO, "MDNS updating service %s...", aName);
+            otbrLog(OTBR_LOG_INFO, "MDNS update service %s", aName);
             error = avahi_entry_group_update_service_txt_strlst(
                 mGroup, AVAHI_IF_UNSPEC, mProtocol, static_cast<AvahiPublishFlags>(0), aName, aType, mDomain, last);
             SuccessOrExit(error);
@@ -543,15 +544,15 @@ otbrError PublisherAvahi::PublishService(uint16_t aPort, const char *aName, cons
         }
     }
 
-    otbrLog(OTBR_LOG_INFO, "MDNS creating service %s...", aName);
+    otbrLog(OTBR_LOG_INFO, "MDNS create service %s", aName);
     error = avahi_entry_group_add_service_strlst(mGroup, AVAHI_IF_UNSPEC, mProtocol, static_cast<AvahiPublishFlags>(0),
                                                  aName, aType, mDomain, mHost, aPort, last);
     SuccessOrExit(error);
 
     {
         Service service;
-        strncpy(service.mName, aName, sizeof(service.mName));
-        strncpy(service.mType, aType, sizeof(service.mType));
+        strcpy_safe(service.mName, sizeof(service.mName), aName);
+        strcpy_safe(service.mType, sizeof(service.mType), aType);
         service.mPort = aPort;
         mServices.push_back(service);
     }

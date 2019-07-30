@@ -81,11 +81,12 @@ void otbrLogSetFilename(const char *aFilename);
 /**
  * This function initialize the logging service.
  *
- * @param[in]   aIdent  Identity of the logger.
- * @param[in]   aLevel  Log level of the logger.
+ * @param[in]   aIdent          Identity of the logger.
+ * @param[in]   aLevel          Log level of the logger.
+ * @param[in]   aPrintStderr    Whether to log to stderr.
  *
  */
-void otbrLogInit(const char *aIdent, int aLevel);
+void otbrLogInit(const char *aIdent, int aLevel, bool aPrintStderr);
 
 /**
  * This function log at level @p aLevel.
@@ -95,6 +96,18 @@ void otbrLogInit(const char *aIdent, int aLevel);
  *
  */
 void otbrLog(int aLevel, const char *aFormat, ...);
+
+/**
+ * This function log a action result according to @p aError.
+ *
+ * If @p aError is OTBR_ERROR_NONE, the log level will be OTBR_LOG_INFO,
+ * otherwise OTBR_LOG_WARNING.
+ *
+ * @param[in]   aAction The action description.
+ * @param[in]   aError  The action result.
+ *
+ */
+void otbrLogResult(const char *aAction, otbrError aError);
 
 /**
  * This function log at level @p aLevel.

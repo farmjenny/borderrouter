@@ -69,7 +69,7 @@ int main(int argc, char **argv)
 
     ot::Web::WebServer *server = NULL;
 
-    while ((opt = getopt(argc, argv, "d:I:p:v:a")) != -1)
+    while ((opt = getopt(argc, argv, "d:I:p:v:a:")) != -1)
     {
         switch (opt)
         {
@@ -119,7 +119,7 @@ int main(int argc, char **argv)
         printf("http port not specified, using default %d\n", port);
     }
 
-    otbrLogInit(kSyslogIdent, logLevel);
+    otbrLogInit(kSyslogIdent, logLevel, true);
     otbrLog(OTBR_LOG_INFO, "border router web started on %s", interfaceName);
 
     server = new ot::Web::WebServer();

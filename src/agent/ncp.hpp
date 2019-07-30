@@ -34,8 +34,17 @@
 #ifndef NCP_HPP_
 #define NCP_HPP_
 
-#include <netinet/in.h>
+#if HAVE_CONFIG_H
+#include "otbr-config.h"
+#endif
 
+#include <netinet/in.h>
+#include <stddef.h>
+#if OTBR_ENABLE_NCP_WPANTUND
+#include "common/mainloop.h"
+#else
+#include <openthread-system.h>
+#endif
 #include "common/event_emitter.hpp"
 #include "common/types.hpp"
 
@@ -83,6 +92,7 @@ public:
      */
     virtual otbrError Init(void) = 0;
 
+#if OTBR_ENABLE_NCP_WPANTUND
     /**
      * This method sends a packet through UDP forward service.
      *
@@ -95,27 +105,23 @@ public:
                                      uint16_t        aPeerPort,
                                      const in6_addr &aPeerAddr,
                                      uint16_t        aSockPort) = 0;
+#endif // OTBR_ENABLE_NCP_WPANTUND
 
     /**
      * This method updates the fd_set to poll.
      *
-     * @param[inout]    aReadFdSet      A reference to fd_set for polling read.
-     * @param[inout]    aWriteFdSet     A reference to fd_set for polling read.
-     * @param[inout]    aErrorFdSet     A reference to fd_set for polling error.
-     * @param[inout]    aMaxFd          A reference to the current max fd.
+     * @param[inout]    aMainloop   A reference to OpenThread mainloop context.
      *
      */
-    virtual void UpdateFdSet(fd_set &aReadFdSet, fd_set &aWriteFdSet, fd_set &aErrorFdSet, int &aMaxFd) = 0;
+    virtual void UpdateFdSet(otSysMainloopContext &aMainloop) = 0;
 
     /**
      * This method performs the DTLS processing.
      *
-     * @param[in]   aReadFdSet          A reference to fd_set ready for reading.
-     * @param[in]   aWriteFdSet         A reference to fd_set ready for writing.
-     * @param[in]   aErrorFdSet         A reference to fd_set with error occurred.
+     * @param[in]       aMainloop   A reference to OpenThread mainloop context.
      *
      */
-    virtual void Process(const fd_set &aReadFdSet, const fd_set &aWriteFdSet, const fd_set &aErrorFdSet) = 0;
+    virtual void Process(const otSysMainloopContext &aMainloop) = 0;
 
     /**
      * This method request the event.
@@ -131,10 +137,12 @@ public:
     /**
      * This method creates a NCP Controller.
      *
-     * @param[in]   aInterfaceName  A string of the NCP interface.
+     * @param[in]   aInterfaceName  A string of the NCP interface name.
+     * @param[in]   aRadioFile      A string of the NCP device file, which can be serial device or executables.
+     * @param[in]   aRadioConfig    A string of the NCP device parameters.
      *
      */
-    static Controller *Create(const char *aInterfaceName);
+    static Controller *Create(const char *aInterfaceName, char *aRadioFile = NULL, char *aRadioConfig = NULL);
 
     /**
      * This method destroys a NCP Controller.
@@ -142,7 +150,7 @@ public:
      * @param[in]   aController     A pointer to the NCP contorller.
      *
      */
-    static void Destroy(Controller *aController);
+    static void Destroy(Controller *aController) { delete aController; }
 
     virtual ~Controller(void) {}
 };

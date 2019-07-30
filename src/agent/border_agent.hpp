@@ -36,7 +36,6 @@
 
 #include <stdint.h>
 
-#include "dtls.hpp"
 #include "mdns.hpp"
 #include "ncp.hpp"
 
@@ -71,14 +70,10 @@ public:
     ~BorderAgent(void);
 
     /**
-     * This method starts border agent service.
-     *
-     * @retval  OTBR_ERROR_NONE     Successfully started border agent.
-     * @retval  OTBR_ERROR_ERRNO    Failed to start border agent.
-     * @retval  OTBR_ERROR_DTLS     Failed to start border agent for DTLS error.
+     * This method initialize border agent service.
      *
      */
-    otbrError Start(void);
+    void Init(void);
 
     /**
      * This method updates the fd_set and timeout for mainloop.
@@ -103,12 +98,24 @@ public:
     void Process(const fd_set &aReadFdSet, const fd_set &aWriteFdSet, const fd_set &aErrorFdSet);
 
 private:
-    static void    SendToCommissioner(void *aContext, int aEvent, va_list aArguments);
-    static ssize_t SendToCommissioner(const uint8_t *aBuffer,
-                                      uint16_t       aLength,
-                                      const uint8_t *aIp6,
-                                      uint16_t       aPort,
-                                      void *         aContext);
+    /**
+     * This method starts border agent service.
+     *
+     * @retval  OTBR_ERROR_NONE     Successfully started border agent.
+     * @retval  OTBR_ERROR_ERRNO    Failed to start border agent.
+     *
+     */
+    otbrError Start(void);
+
+    /**
+     * This method stops border agent service.
+     *
+     */
+    void Stop(void);
+
+#if OTBR_ENABLE_NCP_WPANTUND
+    static void SendToCommissioner(void *aContext, int aEvent, va_list aArguments);
+#endif
 
     static void HandleMdnsState(void *aContext, Mdns::State aState)
     {
@@ -118,13 +125,13 @@ private:
     void PublishService(void);
     void StartPublishService(void);
     void StopPublishService(void);
-    void HandleThreadChange(void);
 
     void SetNetworkName(const char *aNetworkName);
     void SetExtPanId(const uint8_t *aExtPanId);
-    void SetThreadStarted(bool aStarted);
+    void HandleThreadState(bool aStarted);
+    void HandlePSKc(const uint8_t *aPSKc);
 
-    static void HandlePSKcChanged(void *aContext, int aEvent, va_list aArguments);
+    static void HandlePSKc(void *aContext, int aEvent, va_list aArguments);
     static void HandleThreadState(void *aContext, int aEvent, va_list aArguments);
     static void HandleNetworkName(void *aContext, int aEvent, va_list aArguments);
     static void HandleExtPanId(void *aContext, int aEvent, va_list aArguments);
@@ -132,10 +139,13 @@ private:
     Mdns::Publisher *mPublisher;
     Ncp::Controller *mNcp;
 
-    int     mSocket;
+#if OTBR_ENABLE_NCP_WPANTUND
+    int mSocket;
+#endif
     uint8_t mExtPanId[kSizeExtPanId];
     char    mNetworkName[kSizeNetworkName + 1];
     bool    mThreadStarted;
+    bool    mPSKcInitialized;
 };
 
 /**

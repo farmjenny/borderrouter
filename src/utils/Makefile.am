@@ -28,6 +28,8 @@
 
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
+include $(top_srcdir)/third_party/openthread/mbedtls.mk
+
 noinst_LTLIBRARIES = libutils.la
 
 libutils_la_SOURCES = \
@@ -35,11 +37,18 @@ libutils_la_SOURCES = \
     hex.cpp           \
     pskc.cpp          \
     steering_data.cpp \
+    strcpy_utils.cpp  \
     $(NULL)
 
 libutils_la_CPPFLAGS                                    = \
     -I$(top_srcdir)/src                                   \
     -I$(top_srcdir)/third_party/mbedtls/repo/include      \
+    $(MBEDTLS_CPPFLAGS)                                   \
+    $(NULL)
+
+libutils_la_LIBADD                                      = \
+    $(MBEDTLS_LIBS)                                       \
+    $(top_builddir)/src/common/libotbr-logging.la         \
     $(NULL)
 
 noinst_HEADERS      = \
@@ -47,6 +56,7 @@ noinst_HEADERS      = \
     hex.hpp           \
     pskc.hpp          \
     steering_data.hpp \
+    strcpy_utils.hpp  \
     $(NULL)
 
 include $(abs_top_nlbuild_autotools_dir)/automake/post.am

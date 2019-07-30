@@ -44,6 +44,9 @@ extern "C" {
 
 #include "common/code_utils.hpp"
 #include "common/logging.hpp"
+#include "utils/strcpy_utils.hpp"
+
+#if OTBR_ENABLE_NCP_WPANTUND
 
 namespace ot {
 
@@ -97,7 +100,7 @@ DBusHandlerResult ControllerWpantund::HandlePropertyChangedSignal(DBusMessage &a
     VerifyOrExit(key != NULL, result = DBUS_HANDLER_RESULT_NOT_YET_HANDLED);
     dbus_message_iter_next(&iter);
 
-    otbrLog(OTBR_LOG_INFO, "NCP property %s changed.", key);
+    otbrLog(OTBR_LOG_DEBUG, "NCP property %s changed.", key);
     SuccessOrExit(OTBR_ERROR_NONE == ParseEvent(key, &iter));
 
     result = DBUS_HANDLER_RESULT_HANDLED;
@@ -183,12 +186,20 @@ otbrError ControllerWpantund::ParseEvent(const char *aKey, DBusMessageIter *aIte
             }
 #endif
         }
+        else if (DBUS_TYPE_ARRAY == dbus_message_iter_get_arg_type(aIter))
+        {
+            int             count;
+            DBusMessageIter subIter;
+
+            dbus_message_iter_recurse(aIter, &subIter);
+            dbus_message_iter_get_fixed_array(&subIter, &xpanid, &count);
+            VerifyOrExit(count == sizeof(xpanid), ret = OTBR_ERROR_DBUS);
+        }
         else
         {
-            assert(false);
+            ExitNow(ret = OTBR_ERROR_DBUS);
         }
 
-        otbrLog(OTBR_LOG_INFO, "xpanid %llu...", xpanid);
         EventEmitter::Emit(kEventExtPanId, reinterpret_cast<uint8_t *>(&xpanid));
     }
 
@@ -216,12 +227,15 @@ ControllerWpantund::ControllerWpantund(const char *aInterfaceName)
     : mDBus(NULL)
 {
     mInterfaceDBusName[0] = '\0';
-    strncpy(mInterfaceName, aInterfaceName, sizeof(mInterfaceName));
+    strcpy_safe(mInterfaceName, sizeof(mInterfaceName), aInterfaceName);
 }
 
 otbrError ControllerWpantund::UpdateInterfaceDBusPath()
 {
     otbrError ret = OTBR_ERROR_ERRNO;
+
+    memset(mInterfaceDBusPath, 0, sizeof(mInterfaceDBusPath));
+    memset(mInterfaceDBusName, 0, sizeof(mInterfaceDBusName));
 
     VerifyOrExit(lookup_dbus_name_from_interface(mInterfaceDBusName, mInterfaceName) == 0,
                  otbrLog(OTBR_LOG_ERR, "NCP failed to find the interface!"), errno = ENODEV);
@@ -248,7 +262,7 @@ otbrError ControllerWpantund::Init(void)
     VerifyOrExit(dbus_bus_register(mDBus, &error));
 
     sprintf(dbusName, "%s.%s", OTBR_AGENT_DBUS_NAME_PREFIX, mInterfaceName);
-    otbrLog(OTBR_LOG_INFO, "NCP requesting DBus name %s...", dbusName);
+    otbrLog(OTBR_LOG_INFO, "NCP request DBus name %s", dbusName);
     VerifyOrExit(dbus_bus_request_name(mDBus, dbusName, DBUS_NAME_FLAG_DO_NOT_QUEUE, &error) ==
                  DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER);
 
@@ -260,7 +274,9 @@ otbrError ControllerWpantund::Init(void)
 
     VerifyOrExit(dbus_connection_add_filter(mDBus, HandlePropertyChangedSignal, this, NULL));
 
-    ret = UpdateInterfaceDBusPath();
+    // Allow wpantund not started.
+    ret = OTBR_ERROR_NONE;
+    otbrLogResult("Get Thread interface d-bus path", UpdateInterfaceDBusPath());
 
 exit:
     if (dbus_error_is_set(&error))
@@ -275,9 +291,9 @@ exit:
             dbus_connection_unref(mDBus);
             mDBus = NULL;
         }
-        otbrLog(OTBR_LOG_ERR, "NCP failed to initialize!");
     }
 
+    otbrLogResult("NCP initialize", ret);
     return ret;
 }
 
@@ -302,9 +318,11 @@ otbrError ControllerWpantund::UdpForwardSend(const uint8_t * aBuffer,
     std::vector<uint8_t> data(aLength + sizeof(aPeerPort) + sizeof(aPeerAddr) + sizeof(aSockPort));
     const uint8_t *      value = data.data();
     const char *         key   = kWPANTUNDProperty_UdpForwardStream;
+    size_t               index = aLength;
+
+    VerifyOrExit(mInterfaceDBusPath[0] != '\0', errno = EADDRNOTAVAIL);
 
     memcpy(data.data(), aBuffer, aLength);
-    int index       = aLength;
     data[index]     = (aPeerPort >> 8);
     data[index + 1] = (aPeerPort & 0xff);
     index += sizeof(aPeerPort);
@@ -338,13 +356,13 @@ exit:
 
     if (ret != OTBR_ERROR_NONE)
     {
-        otbrLog(OTBR_LOG_INFO, "UdpForwardSend failed: ", otbrErrorString(ret));
+        otbrLog(OTBR_LOG_WARNING, "UdpForwardSend failed: ", otbrErrorString(ret));
     }
 
     return ret;
 }
 
-void ControllerWpantund::UpdateFdSet(fd_set &aReadFdSet, fd_set &aWriteFdSet, fd_set &aErrorFdSet, int &aMaxFd)
+void ControllerWpantund::UpdateFdSet(otSysMainloopContext &aMainloop)
 {
     DBusWatch *  watch = NULL;
     unsigned int flags;
@@ -368,24 +386,24 @@ void ControllerWpantund::UpdateFdSet(fd_set &aReadFdSet, fd_set &aWriteFdSet, fd
 
         if (flags & DBUS_WATCH_READABLE)
         {
-            FD_SET(fd, &aReadFdSet);
+            FD_SET(fd, &aMainloop.mReadFdSet);
         }
 
         if ((flags & DBUS_WATCH_WRITABLE) && dbus_connection_has_messages_to_send(mDBus))
         {
-            FD_SET(fd, &aWriteFdSet);
+            FD_SET(fd, &aMainloop.mWriteFdSet);
         }
 
-        FD_SET(fd, &aErrorFdSet);
+        FD_SET(fd, &aMainloop.mErrorFdSet);
 
-        if (fd > aMaxFd)
+        if (fd > aMainloop.mMaxFd)
         {
-            aMaxFd = fd;
+            aMainloop.mMaxFd = fd;
         }
     }
 }
 
-void ControllerWpantund::Process(const fd_set &aReadFdSet, const fd_set &aWriteFdSet, const fd_set &aErrorFdSet)
+void ControllerWpantund::Process(const otSysMainloopContext &aMainloop)
 {
     DBusWatch *  watch = NULL;
     unsigned int flags;
@@ -407,17 +425,17 @@ void ControllerWpantund::Process(const fd_set &aReadFdSet, const fd_set &aWriteF
             continue;
         }
 
-        if ((flags & DBUS_WATCH_READABLE) && !FD_ISSET(fd, &aReadFdSet))
+        if ((flags & DBUS_WATCH_READABLE) && !FD_ISSET(fd, &aMainloop.mReadFdSet))
         {
             flags &= static_cast<unsigned int>(~DBUS_WATCH_READABLE);
         }
 
-        if ((flags & DBUS_WATCH_WRITABLE) && !FD_ISSET(fd, &aWriteFdSet))
+        if ((flags & DBUS_WATCH_WRITABLE) && !FD_ISSET(fd, &aMainloop.mWriteFdSet))
         {
             flags &= static_cast<unsigned int>(~DBUS_WATCH_WRITABLE);
         }
 
-        if (FD_ISSET(fd, &aErrorFdSet))
+        if (FD_ISSET(fd, &aMainloop.mErrorFdSet))
         {
             flags |= DBUS_WATCH_ERROR;
         }
@@ -455,12 +473,13 @@ otbrError ControllerWpantund::RequestEvent(int aEvent)
         key = kWPANTUNDProperty_NetworkPSKc;
         break;
     default:
-        otbrLog(OTBR_LOG_WARNING, "Unknown event %d", aEvent);
+        assert(false);
         break;
     }
 
-    VerifyOrExit(key != NULL, errno = EINVAL);
-    otbrLog(OTBR_LOG_DEBUG, "Requesting %s...", key);
+    VerifyOrExit(key != NULL && mInterfaceDBusPath[0] != '\0', errno = EINVAL);
+
+    otbrLog(OTBR_LOG_DEBUG, "Request event %s", key);
     VerifyOrExit((message = dbus_message_new_method_call(mInterfaceDBusName, mInterfaceDBusPath,
                                                          WPANTUND_DBUS_APIv1_INTERFACE, WPANTUND_IF_CMD_PROP_GET)) !=
                      NULL,
@@ -496,19 +515,17 @@ exit:
 
     if (ret != OTBR_ERROR_NONE)
     {
-        otbrLog(OTBR_LOG_WARNING, "Error requesting %s:%s", key, otbrErrorString(ret));
+        otbrLog(OTBR_LOG_WARNING, "Error requesting %s: %s", key, otbrErrorString(ret));
     }
     return ret;
 }
 
-Controller *Controller::Create(const char *aInterfaceName)
+Controller *Controller::Create(const char *aInterfaceName, char *aRadioFile, char *aRadioConfig)
 {
-    return new ControllerWpantund(aInterfaceName);
-}
+    (void)aRadioFile;
+    (void)aRadioConfig;
 
-void Controller::Destroy(Controller *aController)
-{
-    delete static_cast<ControllerWpantund *>(aController);
+    return new ControllerWpantund(aInterfaceName);
 }
 
 } // namespace Ncp
@@ -516,3 +533,5 @@ void Controller::Destroy(Controller *aController)
 } // namespace BorderRouter
 
 } // namespace ot
+
+#endif // OTBR_ENABLE_NCP_WPANTUND

@@ -233,8 +233,10 @@ prepare_libmdnssd()
 {
     readonly MDNSRESPONDER_SOURCE=mDNSResponder-878.30.4
 
-    wget "https://opensource.apple.com/tarballs/mDNSResponder/$MDNSRESPONDER_SOURCE.tar.gz"
-    tar xvf "$MDNSRESPONDER_SOURCE.tar.gz"
+    [[ "${WITH_MDNS}" = mDNSResponder ]] || return 0
+
+    wget "https://opensource.apple.com/tarballs/mDNSResponder/${MDNSRESPONDER_SOURCE}.tar.gz"
+    tar xvf "${MDNSRESPONDER_SOURCE}.tar.gz"
     cat > "${MDNSRESPONDER_SOURCE}/Android.mk" <<EOF
 LOCAL_PATH:= \$(call my-dir)
 
@@ -258,6 +260,13 @@ include \$(BUILD_SHARED_LIBRARY)
 EOF
 }
 
+prepare_libchrome_stub()
+{
+    SRC_DIR="$( cd "$(dirname "$0")" ; pwd -P )"
+    mkdir external
+    cp -r "${SRC_DIR}"/../etc/libchrome_stub external/libchrome
+}
+
 #######################################
 # Check build with android build system
 # Globals:
@@ -272,10 +281,13 @@ main()
     prepare_build_system
     prepare_dbus
     prepare_libmdnssd
+    prepare_libchrome_stub
 
     make showcommands otbr-agent
+    make showcommands otbr-agent.conf
 
     test -f out/target/product/generic_arm64/system/bin/otbr-agent
+    test -f out/target/product/generic_arm64/system/etc/dbus-1/system.d/otbr-agent.conf
 }
 
 main "$@"

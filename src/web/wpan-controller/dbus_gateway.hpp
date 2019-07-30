@@ -43,6 +43,7 @@
 
 #include "dbus_base.hpp"
 #include "wpan_controller.hpp"
+#include "utils/strcpy_utils.hpp"
 
 namespace ot {
 namespace Dbus {
@@ -59,7 +60,7 @@ public:
     void SetPrefix(const char *aPrefix) { mPrefix = aPrefix; }
     void SetAddressString(const char *aAddressString)
     {
-        strncpy(mAddressString, aAddressString, strlen(aAddressString));
+        strcpy_safe(mAddressString, sizeof(mAddressString), aAddressString);
         mAddressString[strlen(aAddressString)] = '\0';
     }
     void SetPrefixBytes(uint8_t *aPrefixBytes) { memcpy(mPrefixBytes, aPrefixBytes, sizeof(mPrefixBytes)); }

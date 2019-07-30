@@ -175,7 +175,7 @@ static void LogPrintf(const char *fmt, ...)
 }
 
 /** Initialize logging */
-void otbrLogInit(const char *aIdent, int aLevel)
+void otbrLogInit(const char *aIdent, int aLevel, bool aPrintStderr)
 {
     assert(aIdent);
     assert(aLevel >= LOG_EMERG && aLevel <= LOG_DEBUG);
@@ -186,7 +186,7 @@ void otbrLogInit(const char *aIdent, int aLevel)
     if (!sSyslogOpened)
     {
         sSyslogOpened = true;
-        openlog(aIdent, LOG_CONS | LOG_PID | LOG_PERROR, LOG_USER);
+        openlog(aIdent, (LOG_CONS | LOG_PID) | (aPrintStderr ? LOG_PERROR : 0), LOG_USER);
     }
     sLevel = aLevel;
 }
@@ -317,6 +317,11 @@ const char *otbrErrorString(otbrError aError)
     }
 
     return error;
+}
+
+void otbrLogResult(const char *aAction, otbrError aError)
+{
+    otbrLog((aError == OTBR_ERROR_NONE ? OTBR_LOG_INFO : OTBR_LOG_WARNING), "%s: %s", aAction, otbrErrorString(aError));
 }
 
 void otbrLogDeinit(void)

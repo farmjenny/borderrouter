@@ -42,6 +42,10 @@ android-check)
     (cd .. && "${TRAVIS_BUILD_DIR}/.travis/check-android-build")
     ;;
 
+mdns-mojo-check)
+    ./tests/mdns/test-mojo
+    ;;
+
 pretty-check)
     export PATH=$TOOLS_HOME/usr/bin:$PATH
     ./bootstrap && ./configure && make pretty-check || die
@@ -49,6 +53,21 @@ pretty-check)
 
 posix-check)
     CPPFLAGS="$CFLAGS -I$TOOLS_HOME/usr/include" LDFLAGS="$LDFLAGS -L$TOOLS_HOME/usr/lib" .travis/check-posix
+    ;;
+
+meshcop)
+    if gcc-5 --version; then
+      export CC=gcc-5
+      export CXX=g++-5
+    fi
+
+    ./bootstrap
+    ./script/test build
+
+    OT_CLI="ot-cli-mtd" ./script/test meshcop
+    OT_CLI="ot-cli-ftd" ./script/test meshcop
+    COMMISSIONER_WEB=1 ./script/test meshcop
+    NCP_CONTROLLER=openthread ./script/test clean build meshcop
     ;;
 
 scan-build)

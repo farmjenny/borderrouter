@@ -74,7 +74,7 @@ static bool CheckPSKd(const char *aPSKd)
      * Thus 10 digits + 22 letters = 32 symbols.
      * Thus, "base32" encoding using the above.
      */
-    VerifyOrExit((len >= 6) || (len <= 32), whybad = "invalid length (range: 6..32)");
+    VerifyOrExit((len >= 6) || (len <= 32), whybad = "Invalid PSKd length (range: 6..32)");
 
     for (size_t i = 0; i < len; ++i)
     {
@@ -110,17 +110,17 @@ static void PrintUsage(const char *aProgram, FILE *aStream, int aExitCode)
             "    %s [Options]\n"
             "Options:\n"
             "    -H, --agent-host           STRING      Host of border agent\n"
-            "    -P, --agent-port           NUMBER      UDP port used by border agent\n"
+            "    -P, --agent-port           NUMBER      UDP port of border agent\n"
             "    -N, --network-name         STRING      UTF-8 encoded network name\n"
             "    -C, --network-password     STRING      Thread network password\n"
             "    -X, --xpanid               HEX         Extended PAN ID in hex\n"
             "    -A, --allow-all                        Allow all joiners\n"
             "    -E, --joiner-eui64         HEX         Joiner EUI64 value\n"
-            "    -J, --joiner-pskd          STRING      Base32 thread encoded PSK for the joiner\n"
-            "    -L, --steering-data-length NUMBER      Length of steering data 1..16\n"
+            "    -D, --joiner-pskd          STRING      Joiner's base32-thread encoded PSK\n"
+            "    -L, --steering-data-length NUMBER      Steering data length(1~16)\n"
             "    -l, --log-file             PATH        Log to file\n"
-            "    -i, --keep-alive-interval  NUMBER      Set COMM_KA requests interval\n"
-            "    -d, --debug-level          NUMBER      Enable debug output at level VALUE (0~7)\n"
+            "    -i, --keep-alive-interval  NUMBER      COMM_KA requests interval\n"
+            "    -d, --debug-level          NUMBER      Debug level(0~7)\n"
             "    -q, --disable-syslog                   Disable log via syslog\n"
             "    -h, --help                             Print this help\n",
             aProgram);
@@ -156,6 +156,8 @@ otbrError ParseArgs(int aArgc, char *aArgv[], CommissionerArgs &aArgs)
     bool        isEui64Set      = false;
     bool        allowAllJoiners = false;
 
+    memset(&aArgs, 0, sizeof(aArgs));
+
     aArgs.mKeepAliveInterval = 15;
     aArgs.mDebugLevel        = OTBR_LOG_ERR;
 
@@ -181,8 +183,8 @@ otbrError ParseArgs(int aArgc, char *aArgv[], CommissionerArgs &aArgs)
                          fprintf(stderr, "Invalid joiner EUI64!"));
             break;
         case 'D':
-            VerifyOrExit(CheckPSKd(optarg));
             aArgs.mPSKd = optarg;
+            VerifyOrExit(CheckPSKd(aArgs.mPSKd));
             break;
         case 'A':
             allowAllJoiners = true;
@@ -246,6 +248,7 @@ otbrError ParseArgs(int aArgc, char *aArgv[], CommissionerArgs &aArgs)
         }
     }
 
+    VerifyOrExit(aArgs.mPSKd != NULL, fprintf(stderr, "Missing joiner PSKd!"));
     VerifyOrExit(networkName != NULL, fprintf(stderr, "Missing network name!"));
     VerifyOrExit(networkPassword != NULL, fprintf(stderr, "Missing network password!"));
     VerifyOrExit(isXPanIdSet, fprintf(stderr, "Missing extended PAN ID!"));
@@ -255,7 +258,7 @@ otbrError ParseArgs(int aArgc, char *aArgv[], CommissionerArgs &aArgs)
         steeringLength = (allowAllJoiners ? 1 : kSteeringDefaultLength);
     }
 
-    aArgs.mSteeringData.Init(steeringLength);
+    aArgs.mSteeringData.Init(static_cast<uint8_t>(steeringLength));
 
     if (!allowAllJoiners)
     {

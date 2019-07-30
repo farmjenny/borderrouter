@@ -28,6 +28,9 @@
 
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
+include $(top_srcdir)/third_party/openthread/openthread.mk
+include $(top_srcdir)/third_party/openthread/mbedtls.mk
+
 sbin_PROGRAMS=otbr-agent
 
 otbr_agent_SOURCES = \
@@ -38,12 +41,24 @@ otbr_agent_LDADD     = \
     libotbr-agent.la   \
     $(NULL)
 
+if OTBR_ENABLE_NCP_OPENTHREAD
+otbr_agent_LDADD    += \
+    $(OPENTHREAD_LIBS) \
+    $(MBEDTLS_LIBS)    \
+    -lutil             \
+    $(NULL)
+endif
+
+otbr_agent_LDADD    += \
+    $(NULL)
+
 otbr_agent_LDFLAGS = \
     -static          \
     $(NULL)
 
-otbr_agent_CPPFLAGS    = \
-    -I$(top_srcdir)/src  \
+otbr_agent_CPPFLAGS         = \
+    -I$(top_srcdir)/src       \
+    $(OPENTHREAD_CPPFLAGS)    \
     $(NULL)
 
 noinst_LTLIBRARIES = libotbr-agent.la
@@ -55,33 +70,39 @@ libotbr_agent_la_CXXFLAGS                                     = \
 libotbr_agent_la_SOURCES                                      = \
     agent_instance.cpp                                          \
     border_agent.cpp                                            \
-    coap_libcoap.cpp                                            \
-    dtls_mbedtls.cpp                                            \
-    ncp_wpantund.cpp                                            \
     $(NULL)
 
+if OTBR_ENABLE_NCP_OPENTHREAD
+libotbr_agent_la_SOURCES                                     += \
+    ncp_openthread.cpp                                          \
+    $(NULL)
+endif
+
+if OTBR_ENABLE_NCP_WPANTUND
+libotbr_agent_la_SOURCES                                     += \
+    ncp_wpantund.cpp                                            \
+    $(NULL)
+endif
+
 libotbr_agent_la_LIBADD                                       = \
-    $(top_builddir)/third_party/libcoap/repo/libcoap-1.la       \
-    $(top_builddir)/third_party/mbedtls/libmbedtls.la           \
-    $(top_builddir)/third_party/wpantund/libwpanctl.la          \
     $(top_builddir)/src/common/libotbr-logging.la               \
     $(top_builddir)/src/common/libotbr-event-emitter.la         \
     $(top_builddir)/src/utils/libutils.la                       \
+    $(NULL)
+
+if OTBR_ENABLE_NCP_WPANTUND
+libotbr_agent_la_LIBADD                                      += \
+    $(top_builddir)/third_party/wpantund/libwpanctl.la          \
     $(DBUS_LIBS)                                                \
     $(NULL)
+endif
 
 libotbr_agent_la_LDFLAGS = \
     -static                \
     $(NULL)
 
 libotbr_agent_la_CPPFLAGS                                                  = \
-    -DMBEDTLS_CONFIG_FILE='<config-thread.h>'                                \
-    -I$(top_srcdir)/third_party/mbedtls/repo/configs                         \
-    -I$(top_srcdir)/third_party/mbedtls/repo/include                         \
-    -I$(top_builddir)/third_party/libcoap/repo                               \
     -I$(top_srcdir)/src                                                      \
-    -I$(top_srcdir)/third_party/libcoap/repo                                 \
-    -I$(top_srcdir)/third_party/libcoap/repo/include                         \
     -I$(top_srcdir)/third_party/wpantund/repo/src                            \
     -I$(top_srcdir)/third_party/wpantund/repo/src                            \
     -I$(top_srcdir)/third_party/wpantund/repo/src/ipc-dbus                   \
@@ -89,6 +110,7 @@ libotbr_agent_la_CPPFLAGS                                                  = \
     -I$(top_srcdir)/third_party/wpantund/repo/src/wpantund                   \
     -I$(top_srcdir)/third_party/wpantund/repo/third_party/openthread/src/ncp \
     $(DBUS_CFLAGS)                                                           \
+    $(OPENTHREAD_CPPFLAGS)                                                   \
     $(NULL)
 
 if OTBR_ENABLE_MDNS_AVAHI
@@ -115,16 +137,12 @@ endif
 noinst_HEADERS        = \
     agent_instance.hpp  \
     border_agent.hpp    \
-    coap.hpp            \
-    coap_libcoap.hpp    \
-    dtls.hpp            \
-    dtls_mbedtls.hpp    \
     mdns.hpp            \
     mdns_avahi.hpp      \
     mdns_mdnssd.hpp     \
     ncp.hpp             \
+    ncp_openthread.hpp  \
     ncp_wpantund.hpp    \
-    libcoap.h           \
     uris.hpp            \
     $(NULL)
 

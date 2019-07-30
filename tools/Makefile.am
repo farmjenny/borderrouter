@@ -28,6 +28,8 @@
 
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
+include $(top_srcdir)/third_party/openthread/mbedtls.mk
+
 noinst_PROGRAMS = pskc steering-data
 
 pskc_SOURCES                                              = \
@@ -38,12 +40,12 @@ pskc_CPPFLAGS                                             = \
     -I$(top_srcdir)/src                                     \
     -I$(top_srcdir)/src/agent                               \
     -I$(top_srcdir)/src/web                                 \
-    -I$(top_srcdir)/third_party/mbedtls/repo/include        \
+    $(MBEDTLS_CPPFLAGS)                                     \
     $(NULL)
 
 pskc_LDADD                                                = \
-    $(top_builddir)/src/agent/libotbr-agent.la              \
-    $(top_builddir)/src/web/libotbr-web.la                  \
+    $(top_builddir)/src/common/libotbr-dtls.la              \
+    $(top_builddir)/src/utils/libutils.la                   \
     $(NULL)
 
 pskc_LDFLAGS                                              = \
@@ -57,12 +59,12 @@ steering_data_SOURCES                                     = \
 steering_data_CPPFLAGS                                    = \
     -I$(top_srcdir)/src                                     \
     -I$(top_srcdir)/src/agent                               \
-    -I$(top_srcdir)/third_party/mbedtls/repo/include        \
+    $(MBEDTLS_CPPFLAGS)                                     \
     $(NULL)
 
 steering_data_LDADD                                       = \
-    $(top_builddir)/src/agent/libotbr-agent.la              \
-    $(top_builddir)/src/utils/libutils.la                  \
+    $(top_builddir)/src/common/libotbr-dtls.la              \
+    $(top_builddir)/src/utils/libutils.la                   \
     $(NULL)
 
 steering_data_LDFLAGS                                     = \

@@ -34,6 +34,10 @@
 #ifndef WPAN_SERVICE
 #define WPAN_SERVICE
 
+#if HAVE_CONFIG_H
+#include "otbr-config.h"
+#endif
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,6 +50,9 @@
 #include "common/logging.hpp"
 #include "utils/hex.hpp"
 #include "utils/pskc.hpp"
+
+#include "commissioner/commissioner.hpp"
+#include "commissioner/commissioner_argcargv.hpp"
 
 /**
  * WPAN parameter constants
@@ -127,6 +134,14 @@ public:
     std::string HandleAvailableNetworkRequest(void);
 
     /**
+     * This method handles http request to commission device
+     *
+     * @returns The string to the http response of commissioning
+     *
+     */
+    std::string HandleCommission(const std::string &aCommissionRequest);
+
+    /**
      * This method sets the interface name of the wpantund.
      *
      * @param[in]  aIfName  The pointer to the interface name of wpantund.
@@ -147,7 +162,20 @@ public:
      */
     int GetWpanServiceStatus(std::string &aNetworkName, std::string &aExtPanId) const;
 
+    /**
+     * This method starts commissioner and wait for a device to join
+     *
+     * @param[in]  aPskd                Joiner pskd
+     * @param[in]  aNetworkPassword     Network password
+     *
+     * @returns The string to the http response of getting available networks.
+     *
+     */
+    std::string CommissionDevice(const char *aPskd, const char *aNetworkPassword);
+
 private:
+    int RunCommission(BorderRouter::CommissionerArgs aArgs);
+
     ot::Dbus::WpanNetworkInfo mNetworks[DBUS_MAXIMUM_NAME_LENGTH];
     int                       mNetworksCount;
     char                      mIfName[IFNAMSIZ];
@@ -174,6 +202,9 @@ private:
         kPropertyType_String = 0,
         kPropertyType_Data,
     };
+
+    static const char *kBorderAgentHost;
+    static const char *kBorderAgentPort;
 };
 
 } // namespace Web

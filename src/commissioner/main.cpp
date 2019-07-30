@@ -59,10 +59,11 @@ int main(int argc, char **argv)
 
     SuccessOrExit(error = ParseArgs(argc, argv, args));
 
-    otbrLogInit("Commissioner", args.mDebugLevel);
+    otbrLogInit("Commissioner", args.mDebugLevel, true);
     signal(SIGTERM, HandleSignal);
+    signal(SIGINT, HandleSignal);
 
-    srand(time(0));
+    srand(static_cast<unsigned int>(time(0)));
 
     {
         Commissioner commissioner(args.mPSKc, args.mKeepAliveInterval);
