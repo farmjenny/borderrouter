@@ -62,14 +62,14 @@ namespace external_mojo {
 class ExternalConnector
 {
 public:
-    static inline void Connect(const char *, void *) {}
+    static inline void Connect(const std::string &, void *) {}
 
-    void BindInterface(const char *, chromecast::mojom::MdnsResponderPtr *p) {}
+    void BindInterface(const std::string &, chromecast::mojom::MdnsResponderPtr *p) {}
 
     void set_connection_error_callback(void *) {}
 };
 
-inline const char *GetBrokerPath(void)
+inline std::string GetBrokerPath(void)
 {
     return "";
 }
@@ -78,6 +78,11 @@ inline const char *GetBrokerPath(void)
 } // namespace chromecast
 
 namespace base {
+
+struct TimeDelta
+{
+    static int FromSeconds(int) { return 0; }
+};
 
 void *DoNothing()
 {
@@ -103,6 +108,7 @@ class SingleThreadTaskRunner
 {
 public:
     void PostTask(int, void *) {}
+    void PostDelayedTask(int, void *, int) {}
 };
 
 class CommandLine
