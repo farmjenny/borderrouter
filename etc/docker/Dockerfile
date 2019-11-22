@@ -37,7 +37,8 @@ COPY . /app
 WORKDIR /app
 
 # Required during build or run
-ENV OTBR_DOCKER_REQS sudo
+ENV OTBR_DOCKER_REQS sudo \
+  libreadline-dev
 
 # Required during build, could be removed
 ENV OTBR_DOCKER_DEPS git
