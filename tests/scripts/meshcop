@@ -146,7 +146,7 @@ random_masterkey()
 
 write_syslog()
 {
-  logger -p syslog.alert "OPENTHREAD_TEST: $@"
+  logger -s -p syslog.alert "OPENTHREAD_TEST: $@"
 }
 
 output_logs()
@@ -475,8 +475,8 @@ web_commissioner_start()
 joiner_start()
 {
   write_syslog 'JOINER START'
+  cd ${TEST_BASE}
   expect -f-  <<EOF || die 'JOINER FAILED'
-send "cd ${TEST_BASE}\r\n"
 spawn ${ot_cli} ${JOINER_NODE_ID}
 send "ifconfig up\r\n"
 expect "Done"
