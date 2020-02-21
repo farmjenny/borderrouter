@@ -1,5 +1,5 @@
 #
-#  Copyright (c) 2017, The OpenThread Authors.
+#  Copyright (c) 2020, The OpenThread Authors.
 #  All rights reserved.
 #
 #  Redistribution and use in source and binary forms, with or without
@@ -28,47 +28,40 @@
 
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
-# Always package (e.g. for 'make dist') these subdirectories.
+noinst_LTLIBRARIES = libotbr-dbus.la
 
-DIST_SUBDIRS                                         = \
-    agent                                              \
-    commissioner                                       \
-    common                                             \
-    dbus                                               \
-    utils                                              \
-    web                                                \
+libotbr_dbus_la_CXXFLAGS          = \
+    -fno-exceptions                 \
+    -Wno-missing-field-initializers \
+    -Wno-unused-parameter           \
     $(NULL)
 
-# Always build (e.g. for 'make all') these subdirectories.
-
-SUBDIRS                                              = \
-    common                                             \
-    utils                                              \
-    dbus                                               \
-    agent                                              \
+libotbr_dbus_la_SOURCES   = \
+    dbus_object.cpp         \
+    dbus_message_helper.cpp \
+    error.cpp               \
     $(NULL)
 
-if OTBR_ENABLE_COMMISSIONER
-SUBDIRS                                             += \
-    commissioner                                       \
+libotbr_dbus_la_CPPFLAGS                                   = \
+    -I$(top_srcdir)                                          \
+    -I$(top_srcdir)/include                                  \
+    -I$(top_srcdir)/src                                      \
+    -I$(top_srcdir)/third_party/openthread/repo/src/         \
+    -I$(top_srcdir)/third_party/openthread/repo/include/     \
+    $(DBUS_CFLAGS)          \
     $(NULL)
-endif
 
-if OTBR_ENABLE_WEB_SERVICE
-SUBDIRS                                             += \
-    web                                                \
+libotbr_dbus_la_LIBADD    = \
+    $(DBUS_LIBS)            \
     $(NULL)
-endif
 
-# Always pretty (e.g. for 'make pretty') these subdirectories.
-
-PRETTY_SUBDIRS                                       = \
-    agent                                              \
-    commissioner                                       \
-    common                                             \
-    dbus                                               \
-    utils                                              \
-    web                                                \
+noinst_HEADERS            = \
+    constants.hpp           \
+    dbus_object.hpp         \
+    dbus_request.hpp        \
+    dbus_resources.hpp      \
+    dbus_message_helper.hpp \
+    error.hpp               \
     $(NULL)
 
 include $(abs_top_nlbuild_autotools_dir)/automake/post.am

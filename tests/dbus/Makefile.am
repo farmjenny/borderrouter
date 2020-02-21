@@ -1,5 +1,5 @@
 #
-#  Copyright (c) 2017, The OpenThread Authors.
+#  Copyright (c) 2020, The OpenThread Authors.
 #  All rights reserved.
 #
 #  Redistribution and use in source and binary forms, with or without
@@ -28,47 +28,49 @@
 
 include $(abs_top_nlbuild_autotools_dir)/automake/pre.am
 
-# Always package (e.g. for 'make dist') these subdirectories.
+check_PROGRAMS = otbr-test-dbus-server
 
-DIST_SUBDIRS                                         = \
-    agent                                              \
-    commissioner                                       \
-    common                                             \
-    dbus                                               \
-    utils                                              \
-    web                                                \
+otbr_test_dbus_server_SOURCES = \
+    test-dbus-server.cpp \
     $(NULL)
 
-# Always build (e.g. for 'make all') these subdirectories.
-
-SUBDIRS                                              = \
-    common                                             \
-    utils                                              \
-    dbus                                               \
-    agent                                              \
+otbr_test_dbus_server_CXXFLAGS = \
+    -fno-exceptions \
     $(NULL)
 
-if OTBR_ENABLE_COMMISSIONER
-SUBDIRS                                             += \
-    commissioner                                       \
+otbr_test_dbus_server_CPPFLAGS = \
+    -I$(top_srcdir) \
+    -I$(top_srcdir)/include \
+    -I$(top_srcdir)/src \
+    -I$(top_srcdir)/third_party/openthread/repo/src/ \
+    -I$(top_srcdir)/third_party/openthread/repo/include/ \
+    $(DBUS_CFLAGS) \
     $(NULL)
-endif
 
-if OTBR_ENABLE_WEB_SERVICE
-SUBDIRS                                             += \
-    web                                                \
+otbr_test_dbus_server_LDADD = \
+    $(top_builddir)/src/dbus/libotbr-dbus.la \
     $(NULL)
-endif
 
-# Always pretty (e.g. for 'make pretty') these subdirectories.
+otbr_test_dbus_server_LDFLAGS = \
+    -static \
+    $(NULL)
 
-PRETTY_SUBDIRS                                       = \
-    agent                                              \
-    commissioner                                       \
-    common                                             \
-    dbus                                               \
-    utils                                              \
-    web                                                \
+dist_check_SCRIPTS = \
+    test-server \
+    $(NULL)
+
+EXTRA_DIST                = \
+    otbr-test-dbus-server.conf \
+    $(NULL)
+
+TESTS = \
+    test-server \
+    $(NULL)
+
+TESTS_ENVIRONMENT = \
+    export \
+    srcdir='$(srcdir)' \
+    VERBOSE=1; \
     $(NULL)
 
 include $(abs_top_nlbuild_autotools_dir)/automake/post.am

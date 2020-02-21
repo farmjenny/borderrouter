@@ -26,9 +26,7 @@
  *    POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if HAVE_CONFIG_H
-#include "otbr-config.h"
-#endif
+#include <openthread-br/config.h>
 
 #include <mutex>
 #include <thread>
@@ -153,6 +151,12 @@ static void PrintVersion(void)
     printf("%s\n", PACKAGE_VERSION);
 }
 
+static void OnAllocateFailed(void)
+{
+    otbrLog(OTBR_LOG_CRIT, "Allocate failure, exiting...");
+    exit(1);
+}
+
 int main(int argc, char *argv[])
 {
     int              logLevel = OTBR_LOG_INFO;
@@ -161,6 +165,8 @@ int main(int argc, char *argv[])
     const char *     interfaceName = kDefaultInterfaceName;
     Ncp::Controller *ncp           = NULL;
     bool             verbose       = false;
+
+    std::set_new_handler(OnAllocateFailed);
 
     while ((opt = getopt_long(argc, argv, "d:hI:Vv", kOptions, NULL)) != -1)
     {
